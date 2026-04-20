@@ -1,0 +1,514 @@
+{
+  "name": "Send replies from SL to client",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "YOUR_WEBHOOK_PATH",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0e0d005c-9f95-4154-9bfd-cf0ca84fa6b3",
+      "name": "Webhook",
+      "webhookId": "YOUR_WEBHOOK_PATH"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2c957351-eabd-42bc-975e-f79c8aa85942",
+              "leftValue": "={{ $json.query.event_type }}",
+              "rightValue": "EMAIL_REPLY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "25ad1971-25ef-4d35-b142-503573baa488",
+      "name": "Smartlead or HR?"
+    },
+    {
+      "parameters": {
+        "url": "=https://server.smartlead.ai/api/v1/leads?email={{ $('Webhook').item.json.query.from_email }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        432,
+        -16
+      ],
+      "id": "04fb536d-3efb-454f-bf2d-276f3dd82641",
+      "name": "Get SL lead details",
+      "credentials": {
+        "httpMultipleHeadersAuth": {
+          "id": "vswEKSenWRhAbJPI",
+          "name": "Smartlead"
+        },
+        "httpCustomAuth": {
+          "id": "OAx036Sh0uLCrl49",
+          "name": "Custom SL Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "  const history = $input.first().json.history;                                                                                                   \n  const sent = history.filter(m => m.type === 'SENT');                                                                                           \n  const lastSent = sent[sent.length - 1];                                                                                                        \n  const reply = history.find(m => m.type === 'REPLY');                                                                                           \n                                                                  \n    function stripHtml(html) {                                                                                                                                      \n    html = html.replace(/<blockquote[\\s\\S]*?<\\/blockquote>/gi, '');\n    // Convert block elements to newlines                                                                                                                         \n    html = html.replace(/<br\\s*\\/?>/gi, '\\n');                                                                                                                    \n    html = html.replace(/<\\/p>/gi, '\\n\\n');                                                                                                                       \n    html = html.replace(/<\\/div>/gi, '\\n');                                                                                                                       \n    // Remove remaining tags                                                                                                                                      \n    html = html.replace(/<[^>]+>/g, '');\n    // Decode entities                                                                                                                                            \n    html = html.replace(/&quot;/g, '\"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');                               \n    // Clean up excessive newlines                                                                                                                                \n    html = html.replace(/\\n{3,}/g, '\\n\\n').trim();                                                                                                                \n    return html;                                                                                                                                                  \n  }\n function stripHtml(html) {                                                                                                                                      \n    html = html.replace(/<blockquote[\\s\\S]*?<\\/blockquote>/gi, '');\n    html = html.replace(/<br\\s*\\/?>/gi, '\\n');\n    html = html.replace(/<\\/p>/gi, '\\n\\n');                                                                                                                       \n    html = html.replace(/<\\/div>/gi, '\\n');\n    html = html.replace(/<[^>]+>/g, '');                                                                                                                          \n    html = html.replace(/&quot;/g, '\"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');\n    html = html.replace(/\\n{3,}/g, '\\n\\n').trim();                                                                                                                \n    // Convert back to <br> for HTML email rendering              \n    html = html.replace(/\\n/g, '<br>');                                                                                                                           \n    return html;                                                  \n  } \n                                                                                                                                                 \n  return [{                                                       \n    json: {\n      last_sent: stripHtml(lastSent.email_body),\n      reply: stripHtml(reply.email_body),                                                                                                        \n      subject: lastSent.subject,\n      seq_number: reply.email_seq_number, \n    }                                                                                                                                            \n  }]; "
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -16
+      ],
+      "id": "373b912e-fc73-4c37-8167-c21f2851eefd",
+      "name": "Clean HTML reply"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d9ca320e-157d-4edd-b8a6-26be38ee5174",
+              "leftValue": "={{ $('Get SL lead details').item.json.lead_campaign_data[0].lead_category_id }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            },
+            {
+              "id": "1565871c-97b4-4e58-a0db-aa51bd0b36a2",
+              "leftValue": "={{ $('Get SL lead details').item.json.lead_campaign_data[0].lead_category_id }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7fb0041c-2653-4a17-b0c2-90172fbda9f7",
+              "leftValue": "={{ $('Get SL lead details').item.json.lead_campaign_data[0].lead_category_id }}",
+              "rightValue": 8,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1472,
+        -16
+      ],
+      "id": "49925656-58ee-4e1d-a049-ca29797122b6",
+      "name": "Filter on reply AI category"
+    },
+    {
+      "parameters": {
+        "content": "### We need only the following categories:\n\ninterested\ninformation request\nmeeting request\nuncategorizable by AI",
+        "height": 336,
+        "width": 208,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1408,
+        -208
+      ],
+      "typeVersion": 1,
+      "id": "35889b4c-2b91-4ca1-87ed-c19f2849fde7",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Lookup client FirstName and email').item.json.email }}",
+        "subject": "=Reply received from  {{ $('Get SL lead msg history').item.json.history[2].from }}",
+        "message": "=Hey {{ $('Lookup client FirstName and email').item.json.FirstName }}, \n<br>\nyour campaign <strong>{{ $('Get SL lead details').item.json.lead_campaign_data[0].campaign_name }}</strong> has received a reply from a lead.        \n  <br><br>                                                                                                                                                        \n  <strong>Here's the data:</strong>                               \n  <br><br>\n  First Name: {{ $('Get SL lead details').item.json.first_name }}<br>\n  Last Name: {{ $('Get SL lead details').item.json.last_name }}<br>                                                                                               \n  Company Name: {{ $('Get SL lead details').item.json.company_name }}<br>\n  Email: {{ $('Get SL lead details').item.json.email }}<br>                                                                                                       \n  Company website: {{ $('Get SL lead details').item.json.website }}<br>\n  Reply AI category: {{ {1: 'Interested', 2: 'Meeting Request', 3: 'Not Interested', 5: 'Information Request', 8: 'Uncategorizable by AI'}[$('Get SL lead details').item.json.lead_campaign_data[0].lead_category_id] }}                                                                                                  \n  <br><br>                                                                                                                                                        \n  <strong>{{ $('Get SL lead details').item.json.first_name }} {{ $('Get SL lead details').item.json.last_name }} replied:</strong>                                \n  <br><br>                                                                              <div style=\"background-color:#fef9e7; border-left:2px solid #f0b429; padding:12px; margin:8px 0;\">                                                                          \n  {{ $('Clean HTML reply').item.json.reply }}                                           </div>                                                                             \n  <br><br>                                                                                                                                                        \n  <strong>to the following our message (which was no {{ $('Clean HTML reply').item.json.seq_number }} in sequence):</strong>                                      \n  <br><br>                                                                              <div style=\"background-color:#fef9e7; border-left:2px solid #f0b429; padding:12px; margin:8px 0;\">                                                 \n  {{ $('Clean HTML reply').item.json.last_sent }}\n</div>  \n  <br><br>                                                                                                                                                        \n   <strong>Proceed with the lead now.</strong>                                     \n  <br><br>                                                                                                                                                        \n  Questions, comments, need a call prep? Reply to this message.   \n  <br><br>                                                                                                                                                        \n  Thanks much,<br><br>                                                \n  --<br>                                                                                                                                                          \n  Best regards,<br>                                               \n  Egor Pravilov<br>                                                                                                                                               \n  SharpDMA | Precision outbound<br>\n  sharpdma.com<br>                                                                                                                                                \n  mobile: +372 5857 5065  ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        -16
+      ],
+      "id": "ced41241-943f-4f6e-b6b4-2e6ac32da387",
+      "name": "Send a message",
+      "webhookId": "34bc140f-ed53-42c3-812a-0c26ccafa631",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cswySUlvBtZu0aPM",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "### Listening\nA reply triggers webhook",
+        "height": 240,
+        "width": 176,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -48,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "0de80c46-7492-4086-bfe7-dbe4b52feb7c",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "### Identify the channel\nWhere this reply came from?",
+        "height": 240,
+        "width": 176,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        176,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "c0d0f5d6-6f25-40a0-87b4-6a02ef613f3b",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "### Get lead details",
+        "height": 240,
+        "width": 176
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        384,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "6b1e7baa-39ae-4629-8019-19341f93a197",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "### Clean HTML",
+        "height": 240,
+        "width": 176
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1216,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "7355337c-ecc3-4221-957d-3dada2b5d422",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "### Get message history\nit does not come with the webhook",
+        "height": 240,
+        "width": 168
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1024,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "6b8eb3ed-4b85-489c-b698-4d6ba8882529",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $('Get SL lead details').item.json.lead_campaign_data[0].campaign_id }}/leads/{{ $('Get SL lead details').item.json.id }}/message-history",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1056,
+        -16
+      ],
+      "id": "0516e864-a587-4c75-8195-1f4327550797",
+      "name": "Get SL lead msg history",
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "OAx036Sh0uLCrl49",
+          "name": "Custom SL Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "list",
+          "cachedResultName": "clients_campaigns_ids_for_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Clients data and campaigns IDs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Campaign ID",
+              "lookupValue": "={{ $json.lead_campaign_data[0].campaign_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        640,
+        -16
+      ],
+      "id": "19d3ebd9-baf5-421c-85bf-a2f503c692b3",
+      "name": "Lookup client FirstName and email",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wlyOcfeG6NCHVhCw",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "236e8ec0-0442-4e9f-9995-48cb7be637b9",
+              "leftValue": "={{ $json.FirstName }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        848,
+        -16
+      ],
+      "id": "1f4293f6-2f5d-4fad-84ae-d25d873675e2",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "errorMessage": "No client found, update the Google Sheet now"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        192
+      ],
+      "id": "6796a608-78eb-40b1-81ab-6bdcf0a59df0",
+      "name": "Stop and Error"
+    },
+    {
+      "parameters": {
+        "content": "### Managed to lookup?\nIf no, error msg",
+        "height": 240,
+        "width": 176,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "0c9171e1-d0db-4a05-b9d0-ca5ab2455660",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "### Lookup client data",
+        "height": 240,
+        "width": 176
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        592,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "9284a1e7-8752-4199-b36b-385993cc681a",
+      "name": "Sticky Note7"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Smartlead or HR?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smartlead or HR?": {
+      "main": [
+        [
+          {
+            "node": "Get SL lead details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get SL lead details": {
+      "main": [
+        [
+          {
+            "node": "Lookup client FirstName and email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean HTML reply": {
+      "main": [
+        [
+          {
+            "node": "Filter on reply AI category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter on reply AI category": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get SL lead msg history": {
+      "main": [
+        [
+          {
+            "node": "Clean HTML reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup client FirstName and email": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get SL lead msg history",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "44f1fbba-c503-460f-aa40-02c653d47f9c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_INSTANCE_ID"
+  },
+  "id": "4sA9NMyTbqmMBwi9",
+  "tags": []
+}
